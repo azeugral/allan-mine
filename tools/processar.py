@@ -1,6 +1,6 @@
 """Recorta as fotos escolhidas do Instagram (_ref/ig) em 4:5 e salva WebP em assets/p (640 e 1280 px).
 FOTOS: chave -> (post, foto do carrossel, foco vertical 0..1).
-PARES (antes e depois) usam o mesmo esquema; os três primeiros também viram as texturas do hero (assets/p/h-*.webp, 720x900).
+PARES (antes e depois) usam o mesmo esquema. As texturas do hero saem de tools/hero.py.
 
 Uso: python -I tools/processar.py
 """
@@ -67,9 +67,6 @@ def main():
     for i, (chave, (dep, ant)) in enumerate(PARES.items()):
         d, a = recorte(*dep), recorte(*ant)
         salvar(d, f"{chave}-depois"); salvar(a, f"{chave}-antes")
-        if i < 3:
-            d.resize((720, 900), Image.LANCZOS).save(SAI / f"h-{chave}-depois.webp", quality=82, method=6)
-            a.resize((720, 900), Image.LANCZOS).save(SAI / f"h-{chave}-antes.webp", quality=82, method=6)
     print(len(FOTOS), "fotos,", len(PARES), "pares")
 
 

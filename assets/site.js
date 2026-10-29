@@ -1,33 +1,32 @@
-/* Allan Mine · topo, menu, revelar ao rolar, antes/depois por toque, foto ampliada, pedido para o WhatsApp. */
+/* Allan Mine · legenda do hero, riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
+   antes/depois por toque, foto ampliada e pedido para o WhatsApp. Sem GSAP ou com reduced-motion, tudo aparece parado. */
 (function () {
   const WHATS = '554199873760';
   const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const largo = matchMedia('(min-width: 861px)');
 
   const topo = $('.topo');
   const rolar = () => topo.classList.toggle('rolou', scrollY > 40);
   addEventListener('scroll', rolar, { passive: true }); rolar();
 
-  const bt = $('.abre-menu'), menu = $('#menu');
-  const fechar = () => { menu.classList.remove('aberto'); bt.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; };
-  bt.addEventListener('click', () => {
-    const abre = !menu.classList.contains('aberto');
-    menu.classList.toggle('aberto', abre); bt.setAttribute('aria-expanded', String(abre));
-    document.body.style.overflow = abre ? 'hidden' : '';
+  // legenda do hero acompanha as fases do shader
+  const tela = $('#hero-tela');
+  const ordem = { antes: 0, risco: 1, tinta: 1, final: 2 };
+  tela && tela.addEventListener('fase', e => {
+    const k = ordem[e.detail.fase];
+    $$('.fases li', tela).forEach((li, i) => { li.classList.toggle('ativa', i === k); li.classList.toggle('feita', i < k); });
+    $('[data-nome]', tela).textContent = e.detail.seq.nome;
   });
-  $$('a', menu).forEach(a => a.addEventListener('click', fechar));
 
-  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visto'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
-  $$('.revela').forEach(el => io.observe(el));
-
-  // antes e depois: toque alterna, a linha vermelha corre por cima
-  $$('.par__foto').forEach(b => b.addEventListener('click', () => {
+  // antes e depois: toque troca a foto pequena com a grande
+  $$('.caso__fotos').forEach(b => b.addEventListener('click', () => {
     const on = b.getAttribute('aria-pressed') !== 'true';
     b.setAttribute('aria-pressed', String(on));
-    $('.par__selo', b).textContent = on ? 'Depois' : 'Ver antes';
   }));
 
   // foto ampliada
-  const itens = $$('#grade li a');
+  const itens = $$('#grade a');
   const amp = $('#ampliada'), ampImg = $('img', amp);
   let i = 0, voltaFoco = null;
   function mostrar(n) {
@@ -60,12 +59,11 @@
     if (Math.abs(dx) > 50) mostrar(i + (dx < 0 ? 1 : -1));
   });
 
-  // botões que já escolhem o tipo no pedido
+  // pedido → WhatsApp
   const form = $('#pedido');
   $$('[data-tipo]').forEach(a => a.addEventListener('click', () => {
     const r = $(`input[name=tipo][value="${a.dataset.tipo}"]`, form); if (r) r.checked = true;
   }));
-
   form.addEventListener('submit', e => {
     e.preventDefault();
     const d = new FormData(form), nome = (d.get('nome') || '').trim();
@@ -78,4 +76,86 @@
     linhas.push('Vou mandar a foto aqui na conversa. (mensagem enviada pelo site)');
     window.open(`https://wa.me/${WHATS}?text=${encodeURIComponent(linhas.join('\n'))}`, '_blank', 'noopener');
   });
+
+  // revelar títulos e blocos ao rolar
+  const alvos = $$('section:not(.hero) .rotulo, section:not(.hero) h2, .caso__fala, .cicatriz p, .cicatriz .link-seta, .sobre__frase, .sobre__foto, .pedido, .contatos, .numeros');
+  if (!parado) {
+    alvos.forEach(el => el.classList.add('revela'));
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visto'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -10% 0px' });
+    alvos.forEach(el => io.observe(el));
+  }
+
+  // contadores
+  const contar = el => {
+    const fim = +el.dataset.conta, t0 = performance.now();
+    const passo = t => { const p = Math.min(1, (t - t0) / 1400); el.textContent = Math.round(fim * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(passo); };
+    requestAnimationFrame(passo);
+  };
+  if (!parado) {
+    const ioC = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { $$('[data-conta]', e.target).forEach(contar); ioC.unobserve(e.target); } }), { threshold: .4 });
+    ioC.observe($('.numeros'));
+  }
+
+  // tudo que depende de rolagem: GSAP
+  function comGsap() {
+    const gsap = window.gsap, ST = window.ScrollTrigger;
+    if (!gsap || !ST || parado) {
+      document.documentElement.classList.add('sem-gsap');
+      $$('.risca').forEach(r => r.classList.add('feito'));
+      $$('.risca path, .rodape__nome path').forEach(p => p.style.strokeDashoffset = 0);
+      $('.processo__quadro').style.setProperty('--p', 1);
+      $$('.passo').forEach(p => p.classList.add('ativo'));
+      return;
+    }
+    gsap.registerPlugin(ST);
+
+    // riscados: cada frase é riscada ao passar pelo meio da tela
+    $$('.risca').forEach(r => {
+      const p = $('path', r);
+      gsap.fromTo(p, { strokeDashoffset: 1 }, {
+        strokeDashoffset: 0, ease: 'none',
+        scrollTrigger: { trigger: r, start: 'top 72%', end: 'top 42%', scrub: .6, onUpdate: s => r.classList.toggle('feito', s.progress > .85) }
+      });
+    });
+
+    // rodapé
+    gsap.fromTo('.rodape__nome path', { strokeDashoffset: 1 }, { strokeDashoffset: 0, ease: 'none', scrollTrigger: { trigger: '.rodape__nome', start: 'top 85%', end: 'top 45%', scrub: .6 } });
+
+    // processo: a tatuagem pronta cobre o risco conforme os passos avançam (no celular, conforme a própria imagem passa)
+    const quadro = $('.processo__quadro'), passos = $$('.passo');
+    const mmP = gsap.matchMedia();
+    mmP.add('(min-width: 861px)', () => {
+      passos[0].classList.add('ativo');
+      ST.create({
+        trigger: '.processo ol', start: 'top 65%', end: 'bottom 55%', scrub: .5,
+        onUpdate: s => {
+          quadro.style.setProperty('--p', s.progress.toFixed(4));
+          const k = Math.min(passos.length - 1, Math.floor(s.progress * passos.length));
+          passos.forEach((p, j) => p.classList.toggle('ativo', j <= k));
+        }
+      });
+    });
+    mmP.add('(max-width: 860px)', () => {
+      ST.create({ trigger: quadro, start: 'top 80%', end: 'bottom 35%', scrub: .5, onUpdate: s => quadro.style.setProperty('--p', s.progress.toFixed(4)) });
+    });
+
+    // trabalhos: colunas em velocidades diferentes
+    $$('.coluna').forEach(c => {
+      gsap.fromTo(c, { yPercent: -(+c.dataset.vel) }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
+    });
+
+    // galeria: horizontal fixada no desktop
+    const mm = gsap.matchMedia();
+    mm.add('(min-width: 861px)', () => {
+      const trilho = $('.galeria__trilho');
+      const abre = $('.galeria__abre');
+      const dist = () => trilho.scrollWidth - (innerWidth - abre.offsetWidth);
+      gsap.to(trilho, {
+        x: () => -dist(), ease: 'none',
+        scrollTrigger: { trigger: '.galeria', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: .8, invalidateOnRefresh: true, anticipatePin: 1 }
+      });
+    });
+    ST.refresh();
+  }
+  if (document.readyState === 'complete') comGsap(); else addEventListener('load', comGsap);
 })();

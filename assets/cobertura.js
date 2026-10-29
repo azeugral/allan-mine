@@ -1,129 +1,136 @@
-/* Hero: a tatuagem antiga some e a cobertura aparece por baixo, numa frente de traço vermelho,
-   como a caneta com que o Allan desenha à mão livre direto na pele antes de tatuar.
-   Três pares antes/depois em loop: antes parado → frente varre a foto → depois parado → escurece → próximo par.
-   `prog` = 0→1 da varredura; `luz` = 0→1 entre pares (escurece para trocar as texturas). */
+/* Hero: o processo real do Allan, com fotos dele.
+   1. a pele com a tatuagem antiga (foto do risco com o vermelho apagado, tools/hero.py)
+   2. o risco à mão livre se desenha traço a traço (mapa "tempo": quando cada pixel vermelho entra)
+   3. a tinta preta escorre e a cobertura pronta aparece
+   Duas sequências (escorpião, pássaro) em loop. As fases saem num evento 'fase' para a legenda.
+   `?fase=antes|risco|tinta|final&p=0.5` congela um quadro (conferência). */
 (function () {
-  const caixa = document.getElementById('cobertura');
-  if (!caixa) return;
-  const tela = caixa.querySelector('canvas');
-  const rotulo = caixa.querySelector('[data-rotulo]');
-  const nome = caixa.querySelector('[data-par]');
-  const PARES = JSON.parse(caixa.dataset.pares);
+  const raiz = document.getElementById('hero-tela');
+  if (!raiz) return;
+  const tela = raiz.querySelector('canvas');
+  const SEQ = JSON.parse(raiz.dataset.seq);
   const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const congela = parseFloat(new URLSearchParams(location.search).get('prog'));  // ?prog=0.5 congela a varredura (conferência)
+  const q = new URLSearchParams(location.search);
+  const fq = q.get('fase');
 
   const FS = `precision highp float;
-uniform sampler2D A;uniform sampler2D D;uniform vec2 r;uniform float prog;uniform float luz;uniform float t;
-varying vec2 uv;
+uniform sampler2D L,R,T,F;uniform vec2 r;uniform vec2 img;
+uniform float prog,tinta,luz,zoom,t;
+varying vec2 v;
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
-float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p=p*2.07+3.1;a*=.5;}return v;}
+float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p=p*2.03+1.7;a*=.5;}return s;}
 void main(){
-  vec3 a=texture2D(A,uv).rgb, d=texture2D(D,uv).rgb;
-  // frente: varre de baixo-esquerda para cima-direita, recortada por ruído (borda orgânica de tinta)
-  float campo=(1.-uv.y)*.62+uv.x*.38;
-  campo=campo*.78+fbm(uv*vec2(3.,3.8)+vec2(0.,t*.05))*.42;
-  float f=prog*1.32-.16;
-  float k=campo-f;                                   // <0 já virou cobertura
-  float vira=smoothstep(.012,-.012,k);
-  vec3 col=mix(a,d,vira);
-  // véu escuro de tinta logo atrás da frente
-  col*=1.-.35*smoothstep(.07,0.,abs(k+.03))*step(.001,prog)*step(prog,.999);
-  // traço vermelho do estêncil na frente, com linhas de risco paralelas
-  float fio=smoothstep(.0045,0.,abs(k));
-  float risco=smoothstep(.55,.95,sin((uv.x*1.3+uv.y)*r.y*.09+fbm(uv*9.)*8.))*smoothstep(.05,0.,abs(k-.022));
-  vec3 verm=vec3(.92,.16,.13);
-  float ativo=step(.001,prog)*step(prog,.999);
-  col=mix(col,verm,(fio*.95+risco*.55)*ativo);
-  col+=verm*smoothstep(.03,0.,abs(k))*.09*ativo;
-  // vinheta leve e escurecimento entre pares
-  vec2 c=uv-.5;col*=1.-dot(c,c)*.55;
-  col*=luz;
-  gl_FragColor=vec4(col,1.);
+  // cobre a tela mantendo a proporção da foto (object-fit: cover), com zoom lento
+  float ar=r.x/r.y, ai=img.x/img.y;
+  vec2 esc=ar>ai?vec2(1.,ai/ar):vec2(ar/ai,1.);
+  vec2 uv=(v-.5)*esc/zoom+.5;
+  vec3 limpo=texture2D(L,uv).rgb, risco=texture2D(R,uv).rgb, fim=texture2D(F,uv).rgb;
+  float tp=texture2D(T,uv).r;                      // 1 = não é risco
+  float eh=1.-step(.999,tp);
+  // risco desenhando
+  float desenhado=eh*smoothstep(tp,tp+.014,prog);
+  vec3 col=mix(limpo,risco,desenhado);
+  float ponta=eh*smoothstep(.025,0.,abs(tp-prog))*step(.001,prog)*step(prog,.995);
+  col+=vec3(1.,.4,.3)*ponta*.4;
+  // tinta: nuvem de nanquim que desce, com borda escura
+  float campo=fbm(uv*vec2(2.6,3.2)+vec2(0.,t*.03))*.55+uv.y*.35;
+  float k=campo-(tinta*1.25-.12);
+  float vira=smoothstep(.02,-.02,k);
+  float borda=smoothstep(.07,0.,abs(k))*step(.001,tinta)*step(tinta,.999);
+  col=mix(col,fim,vira);
+  col=mix(col,vec3(.03,.025,.022),borda*.75);
+  vec2 c=v-.5;col*=1.-dot(c,c)*.6;
+  col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)*.035;
+  gl_FragColor=vec4(col*luz,1.);
 }`;
 
-  const gl = tela.getContext('webgl', { antialias: false, premultipliedAlpha: false });
-  const imagens = {};
-  function carregar(src) {
-    return new Promise(ok => { const im = new Image(); im.decoding = 'async'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
-  }
-
-  if (!gl || parado) { caixa.classList.add('estatico'); return; }
+  if (parado) { raiz.classList.add('estatico'); return; }
+  const gl = tela.getContext('webgl', { antialias: false, alpha: false });
+  if (!gl) { raiz.classList.add('estatico'); return; }
   const sh = (tipo, src) => { const o = gl.createShader(tipo); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
-  const vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}');
+  const vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 v;void main(){v=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}');
   const fs = sh(gl.FRAGMENT_SHADER, FS);
-  if (!vs || !fs) { caixa.classList.add('estatico'); return; }
+  if (!vs || !fs) { raiz.classList.add('estatico'); return; }
   const pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
-  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { caixa.classList.add('estatico'); return; }
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { raiz.classList.add('estatico'); return; }
   gl.useProgram(pr);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const lp = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 2, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(pr, n);
-  const uR = U('r'), uP = U('prog'), uL = U('luz'), uT = U('t');
-  gl.uniform1i(U('A'), 0); gl.uniform1i(U('D'), 1);
+  ['L', 'R', 'T', 'F'].forEach((n, i) => gl.uniform1i(U(n), i));
+  const uR = U('r'), uI = U('img'), uP = U('prog'), uTi = U('tinta'), uLu = U('luz'), uZ = U('zoom'), uT = U('t');
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
-  function textura(im) {
+  const carregar = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
+  function textura(im, cinza) {
     const tx = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tx);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, cinza ? gl.NEAREST : gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, im);
+    const fmt = cinza ? gl.LUMINANCE : gl.RGB;
+    gl.texImage2D(gl.TEXTURE_2D, 0, fmt, fmt, gl.UNSIGNED_BYTE, im);
     return tx;
   }
   function medir() {
     const dpr = Math.min(devicePixelRatio || 1, 2), b = tela.getBoundingClientRect();
-    tela.width = Math.round(b.width * dpr); tela.height = Math.round(b.height * dpr);
+    tela.width = Math.max(1, Math.round(b.width * dpr)); tela.height = Math.max(1, Math.round(b.height * dpr));
   }
   medir(); addEventListener('resize', medir);
 
-  const texs = [];
-  let visivel = true;
-  new IntersectionObserver(es => { visivel = es[0].isIntersecting; if (visivel) pedir(); }).observe(tela);
-
-  // tempos (s): antes, varredura, depois, troca
-  const T_ANTES = 1.6, T_VARRE = 2.4, T_DEPOIS = 3.4, T_TROCA = .9, CICLO = T_ANTES + T_VARRE + T_DEPOIS + T_TROCA;
+  // fases (s)
+  const F_ANTES = 1.5, F_RISCO = 4.4, F_PAUSA = 1.1, F_TINTA = 2, F_FINAL = 3.8, F_SAI = .8;
+  const CICLO = F_ANTES + F_RISCO + F_PAUSA + F_TINTA + F_FINAL + F_SAI;
   const suave = x => x * x * (3 - 2 * x);
-  let t0 = null, pedido = 0, parAtual = -1, faseRotulo = '';
+  const seqs = [];
+  let visivel = true, pedido = 0, t0 = null, atual = -1, faseAtual = '';
+  const pedir = () => { if (!pedido) pedido = requestAnimationFrame(quadro); };
+  new IntersectionObserver(es => { visivel = es[0].isIntersecting; if (visivel) pedir(); }).observe(tela);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pedir(); });
 
   function quadro(agora) {
     pedido = 0;
     if (t0 === null) t0 = agora;
     const s = (agora - t0) / 1000;
-    const i = isNaN(congela) ? Math.floor(s / CICLO) % PARES.length : 0, c = s % CICLO;
-    if (!texs[i]) { pedir(); return; }
-    let prog = 0, luz = 1;
-    if (c < T_ANTES) { prog = 0; luz = Math.min(1, c / .5); }
-    else if (c < T_ANTES + T_VARRE) prog = suave((c - T_ANTES) / T_VARRE);
-    else if (c < T_ANTES + T_VARRE + T_DEPOIS) prog = 1;
-    else { prog = 1; luz = 1 - (c - T_ANTES - T_VARRE - T_DEPOIS) / T_TROCA; }
-    if (!isNaN(congela)) { prog = congela; luz = 1; }
-    if (i !== parAtual) {
-      parAtual = i;
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texs[i].a);
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texs[i].d);
-      nome.textContent = PARES[i].nome;
+    let i = Math.floor(s / CICLO) % SEQ.length, c = s % CICLO;
+    if (!seqs[i]) i = 0;
+    let prog = 0, tinta = 0, luz = 1, fase = 'antes';
+    if (c < F_ANTES) luz = Math.min(1, c / .6);
+    else if ((c -= F_ANTES) < F_RISCO) { prog = c / F_RISCO; fase = 'risco'; }
+    else if ((c -= F_RISCO) < F_PAUSA) { prog = 1; fase = 'risco'; }
+    else if ((c -= F_PAUSA) < F_TINTA) { prog = 1; tinta = suave(c / F_TINTA); fase = 'tinta'; }
+    else { prog = 1; tinta = 1; fase = 'final'; c -= F_TINTA; if (c > F_FINAL) luz = 1 - (c - F_FINAL) / F_SAI; }
+    if (fq) {
+      i = 0; luz = 1; fase = fq; const p = parseFloat(q.get('p') || '.5');
+      prog = fq === 'antes' ? 0 : fq === 'risco' ? p : 1; tinta = fq === 'tinta' ? p : fq === 'final' ? 1 : 0;
     }
-    const f = prog < .5 ? 'Antes' : 'Depois';
-    if (f !== faseRotulo) { faseRotulo = f; rotulo.textContent = f; rotulo.classList.toggle('depois', f === 'Depois'); }
+    if (i !== atual) {
+      atual = i;
+      const x = seqs[i];
+      [x.L, x.R, x.T, x.F].forEach((tx, k) => { gl.activeTexture(gl.TEXTURE0 + k); gl.bindTexture(gl.TEXTURE_2D, tx); });
+      gl.uniform2f(uI, x.w, x.h);
+      faseAtual = '';
+    }
+    if (fase !== faseAtual) { faseAtual = fase; raiz.dispatchEvent(new CustomEvent('fase', { detail: { fase, seq: SEQ[i] } })); }
     gl.viewport(0, 0, tela.width, tela.height);
-    gl.uniform2f(uR, tela.width, tela.height); gl.uniform1f(uP, prog); gl.uniform1f(uL, Math.max(0, luz)); gl.uniform1f(uT, s);
+    gl.uniform2f(uR, tela.width, tela.height);
+    gl.uniform1f(uP, prog); gl.uniform1f(uTi, tinta); gl.uniform1f(uLu, Math.max(0, luz));
+    gl.uniform1f(uZ, 1.03 + .05 * ((s % CICLO) / CICLO)); gl.uniform1f(uT, s);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    if (visivel && !document.hidden) pedir();
+    if (visivel && !document.hidden && !fq) pedir();
   }
-  function pedir() { if (!pedido) pedido = requestAnimationFrame(quadro); }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pedir(); });
 
-  // o primeiro par carrega antes de tudo; os outros em seguida
   (async () => {
-    for (let k = 0; k < PARES.length; k++) {
-      const [a, d] = await Promise.all([carregar(PARES[k].antes), carregar(PARES[k].depois)]);
-      if (!a || !d) { caixa.classList.add('estatico'); return; }
-      texs[k] = { a: textura(a), d: textura(d) };
-      if (k === 0) { caixa.classList.add('pronto'); pedir(); }
+    for (let k = 0; k < SEQ.length; k++) {
+      const b = SEQ[k].base;
+      const [L, R, T, F] = await Promise.all(['-limpo.webp', '-risco.webp', '-tempo.png', '-final.webp'].map(x => carregar(b + x)));
+      if (!L || !R || !T || !F) { if (k === 0) raiz.classList.add('estatico'); return; }
+      seqs[k] = { L: textura(L), R: textura(R), T: textura(T), F: textura(F), w: L.width, h: L.height };
+      if (k === 0) { raiz.classList.add('pronto'); pedir(); }
     }
   })();
 })();

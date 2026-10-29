@@ -6,22 +6,27 @@ Publicado em https://azeugral.github.io/allan-mine/ (com `noindex` até a aprova
 
 ## Página
 
-Uma página só (`index.html`):
-- **Hero:** o mote dele, "Cobertura não precisa parecer cobertura", ao lado de um cartão em WebGL (`assets/cobertura.js`) em que a tatuagem antiga some numa frente de traço vermelho e a cobertura aparece por baixo. Três pares em loop.
-- **Antes e depois:** 7 pares. Toque (ou passe o mouse) para ver o antes.
-- **Como funciona:** 4 passos, com o risco vermelho à mão livre e o resultado.
-- **Cicatrizes, trabalhos (16 fotos com foto ampliada) e sobre.**
-- **Orçamento:** formulário que monta a mensagem para o WhatsApp.
+Uma página editorial (`index.html`), com animações em GSAP ScrollTrigger (cdnjs) e WebGL:
+- **Hero:** "Cobertura não precisa parecer cobertura." ao lado do processo real dele, em shader (`assets/cobertura.js`). Mostra a tatuagem antiga, o risco vermelho à mão livre se desenhando traço a traço e a tinta escorrendo até a cobertura pronta. As texturas saem de `tools/hero.py`, que apaga o vermelho das fotos de risco por inpainting e calcula a ordem do traço pela distância geodésica. São duas sequências, escorpião e andorinha. Para conferir um quadro: `?fase=antes|risco|tinta|final&p=0.5`.
+- **Riscados:** frases ("O nome do ex.", "A borboleta dos 15 anos."...) riscadas em vermelho conforme a rolagem.
+- **Antes e depois:** galeria horizontal fixada na tela (no celular, carrossel nativo), com o antes em polaroid e falas tiradas das legendas dele.
+- **Processo:** a andorinha pronta cobre o risco conforme os passos avançam.
+- **Cicatrizes:** bloco vermelho.
+- **Trabalhos:** colagem em três colunas com parallax e foto ampliada.
+- **Sobre:** retrato em duotone com contadores.
+- **Orçamento:** formulário que manda a mensagem pronta para o WhatsApp.
+- **Rodapé:** o nome em tamanho grande.
 
 ## Identidade
 
-Tinta `#100f0e`, papel `#efe9e0` e o vermelho `#e2322a` da caneta com que ele desenha direto na pele. Instrument Serif nos títulos e Geist no texto. Ele não tem logo: o nome é composto em Instrument Serif com um traço vermelho embaixo.
+Nanquim `#0d0c0b`, papel de estêncil `#ebe4d8` e o vermelho `#e3261c` da caneta com que ele risca. Gloock nos títulos, Instrument Sans no texto e IBM Plex Mono nos rótulos. Grão de papel na página toda. Ele não tem logo: o nome é composto em Gloock.
 
 ## Ferramentas
 
 ```
-python -I tools/processar.py  # fotos 4:5 e texturas do hero a partir de ../_ref/ig
-python -I tools/marca.py      # favicons e og.jpg
+python -I tools/processar.py  # fotos 4:5 a partir de ../_ref/ig
+python -I tools/hero.py       # texturas do hero (limpo, risco, tempo, final)
+python -I tools/marca.py      # favicons (o og.jpg da v2 foi feito à parte, com o hero)
 ```
 
 ## CONFIRMAR antes do domínio
