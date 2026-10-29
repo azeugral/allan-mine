@@ -139,9 +139,9 @@
       ST.create({ trigger: quadro, start: 'top 80%', end: 'bottom 35%', scrub: .5, onUpdate: s => quadro.style.setProperty('--p', s.progress.toFixed(4)) });
     });
 
-    // trabalhos: colunas em velocidades diferentes
+    // trabalhos: colunas em velocidades diferentes (começam no lugar, para não subir sobre o título)
     $$('.coluna').forEach(c => {
-      gsap.fromTo(c, { yPercent: -(+c.dataset.vel) }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
+      gsap.fromTo(c, { yPercent: 0 }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
     });
 
     // galeria: horizontal fixada no desktop

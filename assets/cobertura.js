@@ -41,7 +41,7 @@ void main(){
   float borda=smoothstep(.07,0.,abs(k))*step(.001,tinta)*step(tinta,.999);
   col=mix(col,fim,vira);
   col=mix(col,vec3(.03,.025,.022),borda*.75);
-  vec2 c=v-.5;col*=1.-dot(c,c)*.6;
+  vec2 c=v-.5;col*=1.-dot(c,c)*.35;
   col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)*.035;
   gl_FragColor=vec4(col*luz,1.);
 }`;
@@ -83,7 +83,7 @@ void main(){
   medir(); addEventListener('resize', medir);
 
   // fases (s)
-  const F_ANTES = 1.5, F_RISCO = 4.4, F_PAUSA = 1.1, F_TINTA = 2, F_FINAL = 3.8, F_SAI = .8;
+  const F_ANTES = 1.5, F_RISCO = 4.4, F_PAUSA = 1.1, F_TINTA = 2, F_FINAL = 4.2, F_SAI = .5;
   const CICLO = F_ANTES + F_RISCO + F_PAUSA + F_TINTA + F_FINAL + F_SAI;
   const suave = x => x * x * (3 - 2 * x);
   const seqs = [];
