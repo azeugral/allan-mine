@@ -3,7 +3,7 @@
    2. o risco à mão livre se desenha traço a traço (mapa "tempo": quando cada pixel vermelho entra)
    3. a tinta preta escorre e a cobertura pronta aparece
    Duas sequências (escorpião, pássaro) em loop. As fases saem num evento 'fase' para a legenda.
-   `?fase=antes|risco|tinta|final&p=0.5` congela um quadro (conferência). */
+   `?fase=antes|risco|tinta|final&p=0.5` congela um quadro; `?seg=N` começa o loop em N segundos (conferência). */
 (function () {
   const raiz = document.getElementById('hero-tela');
   if (!raiz) return;
@@ -12,10 +12,11 @@
   const parado = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const q = new URLSearchParams(location.search);
   const fq = q.get('fase');
+  const desloc = parseFloat(q.get('seg')) || 0;  // ?seg=13.9 começa o loop nesse instante (conferência)
 
   const FS = `precision highp float;
-uniform sampler2D L,R,T,F;uniform vec2 r;uniform vec2 img;
-uniform float prog,tinta,luz,zoom,t;
+uniform sampler2D L,R,T,F,P;uniform vec2 r;uniform vec2 img;
+uniform float prog,tinta,troca,zoom,t;
 varying vec2 v;
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
@@ -40,15 +41,19 @@ void main(){
   float vira=smoothstep(.02,-.02,k);
   float borda=smoothstep(.07,0.,abs(k))*step(.001,tinta)*step(tinta,.999);
   col=mix(col,fim,vira);
-  col=mix(col,vec3(.03,.025,.022),borda*.75);
+  col=mix(col,vec3(.03,.025,.022),borda*.4);
+  // troca de sequência: a cobertura anterior se dissolve na pele da próxima (sem passar pelo preto)
+  float campo2=fbm(uv*vec2(3.1,2.4)+7.3);
+  col=mix(col,texture2D(P,uv).rgb,smoothstep(-.05,.05,troca*1.25-.12-campo2));
   vec2 c=v-.5;col*=1.-dot(c,c)*.35;
   col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)*.035;
-  gl_FragColor=vec4(col*luz,1.);
+  gl_FragColor=vec4(col,1.);
 }`;
 
   if (parado) { raiz.classList.add('estatico'); return; }
   const gl = tela.getContext('webgl', { antialias: false, alpha: false });
   if (!gl) { raiz.classList.add('estatico'); return; }
+  tela.addEventListener('webglcontextlost', e => { e.preventDefault(); raiz.classList.remove('pronto'); raiz.classList.add('estatico'); });
   const sh = (tipo, src) => { const o = gl.createShader(tipo); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
   const vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 v;void main(){v=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}');
   const fs = sh(gl.FRAGMENT_SHADER, FS);
@@ -60,8 +65,8 @@ void main(){
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const lp = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 2, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(pr, n);
-  ['L', 'R', 'T', 'F'].forEach((n, i) => gl.uniform1i(U(n), i));
-  const uR = U('r'), uI = U('img'), uP = U('prog'), uTi = U('tinta'), uLu = U('luz'), uZ = U('zoom'), uT = U('t');
+  ['L', 'R', 'T', 'F', 'P'].forEach((n, i) => gl.uniform1i(U(n), i));
+  const uR = U('r'), uI = U('img'), uP = U('prog'), uTi = U('tinta'), uTr = U('troca'), uZ = U('zoom'), uT = U('t');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
   const carregar = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
@@ -80,11 +85,11 @@ void main(){
     const dpr = Math.min(devicePixelRatio || 1, 2), b = tela.getBoundingClientRect();
     tela.width = Math.max(1, Math.round(b.width * dpr)); tela.height = Math.max(1, Math.round(b.height * dpr));
   }
-  medir(); addEventListener('resize', medir);
+  medir(); addEventListener('resize', () => { medir(); if (seqs.length) { pedido = 0; quadro(performance.now()); } });
 
   // fases (s)
-  const F_ANTES = 1.5, F_RISCO = 4.4, F_PAUSA = 1.1, F_TINTA = 2, F_FINAL = 4.2, F_SAI = .5;
-  const CICLO = F_ANTES + F_RISCO + F_PAUSA + F_TINTA + F_FINAL + F_SAI;
+  const F_ANTES = 1.8, F_RISCO = 4.4, F_PAUSA = 1.1, F_TINTA = 2, F_FINAL = 4.2, F_TROCA = 1.1;
+  const CICLO = F_ANTES + F_RISCO + F_PAUSA + F_TINTA + F_FINAL;
   const suave = x => x * x * (3 - 2 * x);
   const seqs = [];
   let visivel = true, pedido = 0, t0 = null, atual = -1, faseAtual = '';
@@ -95,33 +100,35 @@ void main(){
   function quadro(agora) {
     pedido = 0;
     if (t0 === null) t0 = agora;
-    const s = (agora - t0) / 1000;
-    let i = Math.floor(s / CICLO) % SEQ.length, c = s % CICLO;
+    const s = (agora - t0) / 1000 + desloc;
+    const volta = Math.floor(s / CICLO);
+    let i = volta % SEQ.length, c = s % CICLO;
     if (!seqs[i]) i = 0;
-    let prog = 0, tinta = 0, luz = 1, fase = 'antes';
-    if (c < F_ANTES) luz = Math.min(1, c / .6);
+    const ant = (i - 1 + SEQ.length) % SEQ.length;
+    let prog = 0, tinta = 0, troca = 0, fase = 'antes';
+    if (c < F_ANTES) { if (volta > 0 && seqs[ant] && ant !== i) troca = 1 - suave(Math.min(1, c / F_TROCA)); }
     else if ((c -= F_ANTES) < F_RISCO) { prog = c / F_RISCO; fase = 'risco'; }
     else if ((c -= F_RISCO) < F_PAUSA) { prog = 1; fase = 'risco'; }
     else if ((c -= F_PAUSA) < F_TINTA) { prog = 1; tinta = suave(c / F_TINTA); fase = 'tinta'; }
-    else { prog = 1; tinta = 1; fase = 'final'; c -= F_TINTA; if (c > F_FINAL) luz = 1 - (c - F_FINAL) / F_SAI; }
+    else { prog = 1; tinta = 1; fase = 'final'; }
     if (fq) {
-      i = 0; luz = 1; fase = fq; const p = parseFloat(q.get('p') || '.5');
+      i = 0; troca = 0; fase = fq; const p = parseFloat(q.get('p') || '.5');
       prog = fq === 'antes' ? 0 : fq === 'risco' ? p : 1; tinta = fq === 'tinta' ? p : fq === 'final' ? 1 : 0;
     }
     if (i !== atual) {
       atual = i;
-      const x = seqs[i];
-      [x.L, x.R, x.T, x.F].forEach((tx, k) => { gl.activeTexture(gl.TEXTURE0 + k); gl.bindTexture(gl.TEXTURE_2D, tx); });
+      const x = seqs[i], pa = seqs[ant] || x;
+      [x.L, x.R, x.T, x.F, pa.F].forEach((tx, k) => { gl.activeTexture(gl.TEXTURE0 + k); gl.bindTexture(gl.TEXTURE_2D, tx); });
       gl.uniform2f(uI, x.w, x.h);
       faseAtual = '';
     }
     if (fase !== faseAtual) { faseAtual = fase; raiz.dispatchEvent(new CustomEvent('fase', { detail: { fase, seq: SEQ[i] } })); }
     gl.viewport(0, 0, tela.width, tela.height);
     gl.uniform2f(uR, tela.width, tela.height);
-    gl.uniform1f(uP, prog); gl.uniform1f(uTi, tinta); gl.uniform1f(uLu, Math.max(0, luz));
+    gl.uniform1f(uP, prog); gl.uniform1f(uTi, tinta); gl.uniform1f(uTr, troca);
     gl.uniform1f(uZ, 1.03 + .05 * ((s % CICLO) / CICLO)); gl.uniform1f(uT, s);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    if (visivel && !document.hidden && !fq) pedir();
+    if (visivel && !document.hidden && !fq && !gl.isContextLost()) pedir();
   }
 
   (async () => {

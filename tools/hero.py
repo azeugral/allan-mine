@@ -78,6 +78,10 @@ def main():
         mi = cv2.dilate(m.astype(np.uint8) * 255, np.ones((5, 5), np.uint8))
         limpo = cv2.inpaint(cv2.cvtColor(a, cv2.COLOR_RGB2BGR), mi, 7, cv2.INPAINT_TELEA)
         limpo = cv2.cvtColor(limpo, cv2.COLOR_BGR2RGB)
+        # só na área reconstruída: suaviza as manchas do inpainting (com borda macia para não marcar)
+        suave = cv2.GaussianBlur(limpo, (0, 0), 3.2)
+        peso = cv2.GaussianBlur(mi.astype(np.float32) / 255, (0, 0), 4)[..., None]
+        limpo = (limpo * (1 - peso) + suave * peso).astype(np.uint8)
         t = tempo(cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
         Image.fromarray(limpo).save(SAI / f"{nome}-limpo.webp", quality=84, method=6)
         Image.fromarray(a).save(SAI / f"{nome}-risco.webp", quality=84, method=6)
