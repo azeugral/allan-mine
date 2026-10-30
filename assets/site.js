@@ -1,4 +1,4 @@
-/* Allan Mine · legenda do hero, riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
+/* Allan Mine · riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
    antes/depois por toque, foto ampliada e pedido para o WhatsApp. Sem GSAP ou com reduced-motion, tudo aparece parado. */
 (function () {
   const WHATS = '554199873760';
@@ -9,15 +9,6 @@
   const topo = $('.topo');
   const rolar = () => topo.classList.toggle('rolou', scrollY > 40);
   addEventListener('scroll', rolar, { passive: true }); rolar();
-
-  // legenda do hero acompanha as fases do shader
-  const tela = $('#hero-tela');
-  const ordem = { antes: 0, risco: 1, tinta: 1, final: 2 };
-  tela && tela.addEventListener('fase', e => {
-    const k = ordem[e.detail.fase];
-    $$('.fases li', tela).forEach((li, i) => { li.classList.toggle('ativa', i === k); li.classList.toggle('feita', i < k); });
-    $('[data-nome]', tela).textContent = e.detail.seq.nome;
-  });
 
   // antes e depois: toque troca a foto pequena com a grande
   $$('.caso__fotos').forEach(b => b.addEventListener('click', () => {

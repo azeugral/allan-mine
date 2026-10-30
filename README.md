@@ -6,8 +6,8 @@ Publicado em https://azeugral.github.io/allan-mine/ (com `noindex` até a aprova
 
 ## Página
 
-Uma página editorial (`index.html`), com animações em GSAP ScrollTrigger (cdnjs) e WebGL:
-- **Hero:** "Cobertura não precisa parecer cobertura." ao lado do processo real dele, em shader (`assets/cobertura.js`). Mostra a tatuagem antiga, o risco vermelho à mão livre se desenhando traço a traço e a tinta escorrendo até a cobertura pronta. As texturas saem de `tools/hero.py`, que apaga o vermelho das fotos de risco por inpainting e calcula a ordem do traço pela distância geodésica. São duas sequências, escorpião e andorinha. Para conferir um quadro: `?fase=antes|risco|tinta|final&p=0.5`.
+Uma página editorial (`index.html`), com animações em GSAP ScrollTrigger (cdnjs):
+- **Hero:** "Cobertura não precisa parecer cobertura." ao lado do processo real dele, em vídeo (`assets/hero/hero.mp4`, renderizado por `tools/hero_video.py`; a legenda das fases fica em `assets/hero.js`). Mostra a tatuagem antiga, o risco vermelho à mão livre se desenhando traço a traço e a cortina com a linha vermelha revelando a cobertura pronta. As texturas saem de `tools/hero.py`, que apaga o vermelho das fotos de risco por inpainting e calcula a ordem do traço pela distância geodésica. São duas sequências, andorinha e escorpião. Se mudar os tempos no `hero_video.py`, copie o `assets/hero/fases.json` para os `data-*` de `#hero-tela` no `index.html`.
 - **Riscados:** frases ("O nome do ex.", "A borboleta dos 15 anos."...) riscadas em vermelho conforme a rolagem.
 - **Antes e depois:** galeria horizontal fixada na tela (no celular, carrossel nativo), com o antes em polaroid e falas tiradas das legendas dele.
 - **Processo:** a andorinha pronta cobre o risco conforme os passos avançam.
@@ -26,6 +26,7 @@ Nanquim `#0d0c0b`, papel de estêncil `#ebe4d8` e o vermelho `#e3261c` da caneta
 ```
 python -I tools/processar.py  # fotos 4:5 a partir de ../_ref/ig
 python -I tools/hero.py       # texturas do hero (limpo, risco, tempo, final)
+python -I tools/hero_video.py # vídeo do hero, pôster e fases.json (precisa de ffmpeg)
 python -I tools/marca.py      # favicons (o og.jpg da v2 foi feito à parte, com o hero)
 ```
 

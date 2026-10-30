@@ -3,7 +3,7 @@ Por sequência: antes (pele com a tatuagem antiga) → o risco vermelho se desen
 → pausa → cortina com a linha vermelha descendo revela a cobertura pronta → pausa → cortina para a próxima sequência.
 Cortina em vez de dissolução: as fotos têm enquadramentos diferentes e a dissolução criava dupla exposição.
 Vídeo em vez de WebGL ao vivo: fica igual em qualquer aparelho, sem depender da placa de vídeo.
-Os tempos (FASES) também vão para assets/hero/fases.json, que a legenda do site usa.
+Os tempos vão para assets/hero/fases.json; copie-os para os data-* de #hero-tela no index.html (a legenda usa).
 
 Uso: python -I tools/hero_video.py
 """
@@ -64,8 +64,10 @@ def quadro_seq(dados, s, dur):
         d = (np.clip((p - tp) / .014, 0, 1) * eh)[..., None]
         img = limpo * (1 - d) + risco * d
         if p < 1:
-            ponta = (np.clip(1 - np.abs(tp - p) / .025, 0, 1) * eh)[..., None]
-            img = np.clip(img + np.array([1, .42, .32]) * ponta * .45, 0, 1)
+            # brilho na ponta da caneta só sobre o traço (no entorno do risco ele estourava a pele em manchas claras)
+            traco = np.clip((np.abs(risco - limpo).sum(-1) - .06) / .2, 0, 1)
+            ponta = (np.clip(1 - np.abs(tp - p) / .012, 0, 1) * eh * traco)[..., None]
+            img = np.clip(img + np.array([.5, .08, .05]) * ponta * .5, 0, 1)
     else:
         f = suave((s - T_ANTES - T_RISCO - T_PAUSA) / T_FUNDE)
         img = cortina(risco, fim, f)
@@ -100,8 +102,9 @@ def main():
                     "-movflags", "+faststart", "-an", str(mp4)], check=True)
     # poster: a cobertura pronta da primeira sequência (aparece se o vídeo não tocar)
     Image.open(tmp / f"{int((dur - T_TROCA - .5) * FPS):05d}.png").save(H / "hero-poster.webp", quality=82)
-    fases = {"duracao": dur, "seq": len(SEQ),
-             "antes": T_ANTES, "risco": T_ANTES + T_RISCO + T_PAUSA, "final": dur}
+    fases = {k: round(v, 3) for k, v in {"duracao": dur, "antes": T_ANTES, "risco": T_ANTES + T_RISCO + T_PAUSA,
+                                         "troca": T_TROCA}.items()}
+    fases["seq"] = len(SEQ)
     (H / "fases.json").write_text(json.dumps(fases), encoding="utf-8")
     shutil.rmtree(tmp)
     print("hero.mp4", round(mp4.stat().st_size / 1e6, 2), "MB,", n, "quadros,", round(total, 1), "s")
