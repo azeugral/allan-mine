@@ -1,4 +1,4 @@
-/* Allan Mine · legenda do hero, riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
+/* Allan Mine · riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
    antes/depois por toque, foto ampliada e pedido para o WhatsApp. Sem GSAP ou com reduced-motion, tudo aparece parado. */
 (function () {
   const WHATS = '554199873760';
@@ -76,6 +76,27 @@
     alvos.forEach(el => io.observe(el));
   }
 
+  // processo: o passo que cruza a linha de leitura troca a foto (foto, avaliação, risco, cobertura)
+  const quadro = $('.processo__quadro'), visual = $('.processo__visual'), passos = $$('.passo');
+  const fotos = $$('img', quadro), marcas = $$('.processo__marcas i'), FOTO = [0, 0, 1, 2];
+  let atual = 0;
+  function passoAtivo(n) {
+    if (n === atual) return;
+    atual = n;
+    passos.forEach((p, j) => p.classList.toggle('ativo', j === n));
+    marcas.forEach((m, j) => m.classList.toggle('on', j <= n));
+    fotos.forEach((f, j) => f.classList.toggle('on', j === FOTO[n]));
+    quadro.dataset.passo = n;
+    visual.classList.add('troca');
+    setTimeout(() => {
+      $('[data-num]', quadro).textContent = '0' + (atual + 1);
+      $('[data-legenda]', visual).textContent = passos[atual].dataset.legenda;
+      visual.classList.remove('troca');
+    }, 300);
+  }
+  const ioP = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) passoAtivo(passos.indexOf(e.target)); }), { rootMargin: '-62% 0px -37% 0px' });
+  passos.forEach(p => ioP.observe(p));
+
   // contadores
   const contar = el => {
     const fim = +el.dataset.conta, t0 = performance.now();
@@ -94,8 +115,6 @@
       document.documentElement.classList.add('sem-gsap');
       $$('.risca').forEach(r => r.classList.add('feito'));
       $$('.risca svg, .rodape__nome svg').forEach(s => s.style.clipPath = 'none');
-      $('.processo__quadro').style.setProperty('--p', 1);
-      $$('.passo').forEach(p => p.classList.add('ativo'));
       return;
     }
     gsap.registerPlugin(ST);
@@ -124,27 +143,11 @@
     // rodapé
     gsap.fromTo('.rodape__nome svg', { clipPath: 'inset(-50% 100% -50% -2%)' }, { clipPath: 'inset(-50% -2% -50% -2%)', ease: 'none', scrollTrigger: { trigger: '.rodape__nome', start: 'top 85%', end: 'top 45%', scrub: .6 } });
 
-    // processo: a tatuagem pronta cobre o risco conforme os passos avançam (no celular, conforme a própria imagem passa)
-    const quadro = $('.processo__quadro'), passos = $$('.passo');
-    const mmP = gsap.matchMedia();
-    mmP.add('(min-width: 861px)', () => {
-      passos[0].classList.add('ativo');
-      ST.create({
-        trigger: '.processo ol', start: 'top 65%', end: 'bottom 55%', scrub: .5,
-        onUpdate: s => {
-          quadro.style.setProperty('--p', s.progress.toFixed(4));
-          const k = Math.min(passos.length - 1, Math.floor(s.progress * passos.length));
-          passos.forEach((p, j) => p.classList.toggle('ativo', j <= k));
-        }
+    // trabalhos: só a coluna do meio se move (sobe devagar a partir do degrau), as de fora ficam alinhadas
+    gsap.matchMedia().add('(min-width: 861px)', () => {
+      $$('.coluna').filter(c => +c.dataset.vel).forEach(c => {
+        gsap.fromTo(c, { yPercent: 0 }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
       });
-    });
-    mmP.add('(max-width: 860px)', () => {
-      ST.create({ trigger: quadro, start: 'top 80%', end: 'bottom 35%', scrub: .5, onUpdate: s => quadro.style.setProperty('--p', s.progress.toFixed(4)) });
-    });
-
-    // trabalhos: colunas em velocidades diferentes (começam no lugar, para não subir sobre o título)
-    $$('.coluna').forEach(c => {
-      gsap.fromTo(c, { yPercent: 0 }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
     });
 
     ST.refresh();
