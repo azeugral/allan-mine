@@ -1,4 +1,4 @@
-/* Allan Mine · riscados, galeria horizontal, processo, parallax e contadores (GSAP ScrollTrigger),
+/* Allan Mine · riscados, galeria horizontal, processo fixado e contadores (GSAP ScrollTrigger),
    antes/depois por toque, foto ampliada e pedido para o WhatsApp. Sem GSAP ou com reduced-motion, tudo aparece parado. */
 (function () {
   const WHATS = '554199873760';
@@ -69,33 +69,13 @@
   });
 
   // revelar títulos e blocos ao rolar
-  const alvos = $$('section:not(.hero) .rotulo, section:not(.hero) h2, .caso__fala, .cicatriz p, .cicatriz .link-seta, .sobre__frase, .sobre__foto, .pedido, .contatos, .numeros');
+  const alvos = $$('section:not(.hero) .rotulo, section:not(.hero) h2, .obra, .trabalhos__cabeca p, .caso__fala, .cicatriz p, .cicatriz .link-seta, .sobre__frase, .sobre__foto, .pedido, .contatos, .numeros');
   if (!parado) {
     alvos.forEach(el => el.classList.add('revela'));
+    $$('.obra').forEach((o, n) => { o.style.transitionDelay = (n % 4) * .07 + 's'; });
     const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visto'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -10% 0px' });
     alvos.forEach(el => io.observe(el));
   }
-
-  // processo: o passo que cruza a linha de leitura troca a foto (foto, avaliação, risco, cobertura)
-  const quadro = $('.processo__quadro'), visual = $('.processo__visual'), passos = $$('.passo');
-  const fotos = $$('img', quadro), marcas = $$('.processo__marcas i'), FOTO = [0, 0, 1, 2];
-  let atual = 0;
-  function passoAtivo(n) {
-    if (n === atual) return;
-    atual = n;
-    passos.forEach((p, j) => p.classList.toggle('ativo', j === n));
-    marcas.forEach((m, j) => m.classList.toggle('on', j <= n));
-    fotos.forEach((f, j) => f.classList.toggle('on', j === FOTO[n]));
-    quadro.dataset.passo = n;
-    visual.classList.add('troca');
-    setTimeout(() => {
-      $('[data-num]', quadro).textContent = '0' + (atual + 1);
-      $('[data-legenda]', visual).textContent = passos[atual].dataset.legenda;
-      visual.classList.remove('troca');
-    }, 300);
-  }
-  const ioP = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) passoAtivo(passos.indexOf(e.target)); }), { rootMargin: '-62% 0px -37% 0px' });
-  passos.forEach(p => ioP.observe(p));
 
   // contadores
   const contar = el => {
@@ -118,6 +98,7 @@
       return;
     }
     gsap.registerPlugin(ST);
+    ST.config({ ignoreMobileResize: true });
 
     // galeria: horizontal fixada no desktop. Criada antes dos gatilhos abaixo dela,
     // senão eles calculam início e fim sem o espaço do pin e o processo chega pronto.
@@ -132,6 +113,37 @@
       });
     });
 
+    // processo: palco fixado; a rolagem leva a foto do antes à avaliação (zoom e o círculo da caneta),
+    // ao risco (as linhas aparecem por cima da mesma foto) e à cobertura, que se espalha do centro como tinta
+    const palco = $('.processo__palco'), passos = $$('.passo'), trilho = $$('.processo__trilho i');
+    const foto = $('.processo__foto'), mira = $('.processo__mira');
+    const num = $('[data-num]', palco), leg = $('[data-etapa]', palco);
+    let atual = 0;
+    const tl = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: {
+        trigger: palco, start: 'top top', end: () => '+=' + Math.round(innerHeight * 3.2), pin: true, scrub: .7, anticipatePin: 1, invalidateOnRefresh: true,
+        onUpdate: s => {
+          const p = s.progress * 4;
+          trilho.forEach((t, j) => t.style.setProperty('--f', Math.min(1, Math.max(0, p - j)).toFixed(3)));
+          const n = Math.min(3, Math.floor(p));
+          if (n === atual) return;
+          atual = n;
+          passos.forEach((x, j) => x.classList.toggle('ativo', j === n));
+          num.textContent = '0' + (n + 1);
+          leg.textContent = passos[n].dataset.legenda;
+        }
+      }
+    });
+    tl.fromTo(foto, { scale: 1.08 }, { scale: 1, duration: 1 }, 0)
+      .to(foto, { scale: 1.16, duration: 1 }, 1)
+      .to(mira, { opacity: 1, duration: .12 }, 1.1)
+      .fromTo(mira, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: .7 }, 1.1)
+      .to(mira, { opacity: 0, duration: .3 }, 2)
+      .to('.p-risco', { opacity: 1, duration: 1 }, 2)
+      .to(foto, { scale: 1.02, duration: 1 }, 2)
+      .fromTo('.p-final', { '--r': -30 }, { '--r': 100, duration: 1, ease: 'power1.inOut' }, 3);
+
     // riscados: cada frase é riscada ao passar pelo meio da tela
     $$('.risca').forEach(r => {
       gsap.fromTo($('svg', r), { clipPath: 'inset(-50% 100% -50% -2%)' }, {
@@ -142,13 +154,6 @@
 
     // rodapé
     gsap.fromTo('.rodape__nome svg', { clipPath: 'inset(-50% 100% -50% -2%)' }, { clipPath: 'inset(-50% -2% -50% -2%)', ease: 'none', scrollTrigger: { trigger: '.rodape__nome', start: 'top 85%', end: 'top 45%', scrub: .6 } });
-
-    // trabalhos: só a coluna do meio se move (sobe devagar a partir do degrau), as de fora ficam alinhadas
-    gsap.matchMedia().add('(min-width: 861px)', () => {
-      $$('.coluna').filter(c => +c.dataset.vel).forEach(c => {
-        gsap.fromTo(c, { yPercent: 0 }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
-      });
-    });
 
     ST.refresh();
   }
