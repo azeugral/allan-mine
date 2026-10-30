@@ -10,15 +10,6 @@
   const rolar = () => topo.classList.toggle('rolou', scrollY > 40);
   addEventListener('scroll', rolar, { passive: true }); rolar();
 
-  // legenda do hero acompanha as fases do shader
-  const tela = $('#hero-tela');
-  const ordem = { antes: 0, risco: 1, tinta: 1, final: 2 };
-  tela && tela.addEventListener('fase', e => {
-    const k = ordem[e.detail.fase];
-    $$('.fases li', tela).forEach((li, i) => { li.classList.toggle('ativa', i === k); li.classList.toggle('feita', i < k); });
-    $('[data-nome]', tela).textContent = e.detail.seq.nome;
-  });
-
   // antes e depois: toque troca a foto pequena com a grande
   $$('.caso__fotos').forEach(b => b.addEventListener('click', () => {
     const on = b.getAttribute('aria-pressed') !== 'true';
@@ -102,24 +93,36 @@
     if (!gsap || !ST || parado) {
       document.documentElement.classList.add('sem-gsap');
       $$('.risca').forEach(r => r.classList.add('feito'));
-      $$('.risca path, .rodape__nome path').forEach(p => p.style.strokeDashoffset = 0);
+      $$('.risca svg, .rodape__nome svg').forEach(s => s.style.clipPath = 'none');
       $('.processo__quadro').style.setProperty('--p', 1);
       $$('.passo').forEach(p => p.classList.add('ativo'));
       return;
     }
     gsap.registerPlugin(ST);
 
+    // galeria: horizontal fixada no desktop. Criada antes dos gatilhos abaixo dela,
+    // senão eles calculam início e fim sem o espaço do pin e o processo chega pronto.
+    const mm = gsap.matchMedia();
+    mm.add('(min-width: 861px)', () => {
+      const trilho = $('.galeria__trilho');
+      const abre = $('.galeria__abre');
+      const dist = () => trilho.scrollWidth - (innerWidth - abre.offsetWidth);
+      gsap.to(trilho, {
+        x: () => -dist(), ease: 'none',
+        scrollTrigger: { trigger: '.galeria', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: .8, invalidateOnRefresh: true, anticipatePin: 1 }
+      });
+    });
+
     // riscados: cada frase é riscada ao passar pelo meio da tela
     $$('.risca').forEach(r => {
-      const p = $('path', r);
-      gsap.fromTo(p, { strokeDashoffset: 1 }, {
-        strokeDashoffset: 0, ease: 'none',
+      gsap.fromTo($('svg', r), { clipPath: 'inset(-50% 100% -50% -2%)' }, {
+        clipPath: 'inset(-50% -2% -50% -2%)', ease: 'none',
         scrollTrigger: { trigger: r, start: 'top 72%', end: 'top 42%', scrub: .6, onUpdate: s => r.classList.toggle('feito', s.progress > .85) }
       });
     });
 
     // rodapé
-    gsap.fromTo('.rodape__nome path', { strokeDashoffset: 1 }, { strokeDashoffset: 0, ease: 'none', scrollTrigger: { trigger: '.rodape__nome', start: 'top 85%', end: 'top 45%', scrub: .6 } });
+    gsap.fromTo('.rodape__nome svg', { clipPath: 'inset(-50% 100% -50% -2%)' }, { clipPath: 'inset(-50% -2% -50% -2%)', ease: 'none', scrollTrigger: { trigger: '.rodape__nome', start: 'top 85%', end: 'top 45%', scrub: .6 } });
 
     // processo: a tatuagem pronta cobre o risco conforme os passos avançam (no celular, conforme a própria imagem passa)
     const quadro = $('.processo__quadro'), passos = $$('.passo');
@@ -144,17 +147,6 @@
       gsap.fromTo(c, { yPercent: 0 }, { yPercent: +c.dataset.vel, ease: 'none', scrollTrigger: { trigger: '.colagem', start: 'top bottom', end: 'bottom top', scrub: true } });
     });
 
-    // galeria: horizontal fixada no desktop
-    const mm = gsap.matchMedia();
-    mm.add('(min-width: 861px)', () => {
-      const trilho = $('.galeria__trilho');
-      const abre = $('.galeria__abre');
-      const dist = () => trilho.scrollWidth - (innerWidth - abre.offsetWidth);
-      gsap.to(trilho, {
-        x: () => -dist(), ease: 'none',
-        scrollTrigger: { trigger: '.galeria', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: .8, invalidateOnRefresh: true, anticipatePin: 1 }
-      });
-    });
     ST.refresh();
   }
   if (document.readyState === 'complete') comGsap(); else addEventListener('load', comGsap);
