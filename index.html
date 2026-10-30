@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="assets/hero/passaro-limpo.webp">
+<link rel="preload" as="image" href="assets/hero/hero-poster.webp">
 <link rel="stylesheet" href="assets/style.css?v=3">
 <script>document.documentElement.classList.add("js")</script>
 <script type="application/ld+json">
@@ -62,9 +62,8 @@
     </div>
   </div>
 
-  <figure class="hero__tela" id="hero-tela" data-seq='[{"base":"assets/hero/passaro","nome":"Andorinha riscada à mão livre"},{"base":"assets/hero/escorpiao","nome":"Escorpião antigo coberto com rosas"}]'>
-    <canvas aria-hidden="true"></canvas>
-    <img class="hero__estatica" src="assets/hero/passaro-final.webp" width="858" height="1100" alt="Andorinha em preto e cinza tatuada no braço">
+  <figure class="hero__tela" id="hero-tela" data-dur="11.3" data-antes="1.4" data-risco="7.05" data-nomes='["Andorinha riscada à mão livre","Escorpião antigo coberto com rosas"]'>
+    <video class="hero__video" src="assets/hero/hero.mp4?v=1" poster="assets/hero/hero-poster.webp" autoplay muted loop playsinline preload="auto" aria-label="O risco à mão livre se desenhando sobre a pele e virando tatuagem"></video>
     <figcaption class="fases">
       <ol>
         <li data-fase="antes"><span>Antes</span></li>
@@ -267,7 +266,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
-<script src="assets/cobertura.js?v=4" defer></script>
+<script src="assets/hero.js?v=1" defer></script>
 <script src="assets/site.js?v=3" defer></script>
 </body>
 </html>
